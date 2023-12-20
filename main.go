@@ -39,9 +39,9 @@ type httpline struct {
 	TLS  *bool  `json:"tls,omitempty"`
 	Req  string `json:"req"`
 
+	Reqat *time.Time `json:"reqat,omitempty"`
+	Ping  int64      `json:"ping,omitempty"`
 	Resp  string     `json:"resp,omitempty"`
-	Ping  int        `json:"ping,omitempty"` // TODO
-	Time  *time.Time `json:"time,omitempty"` // TODO
 	Err   string     `json:"err,omitempty"`
 	Errno int        `json:"errno,omitempty"`
 }
@@ -120,8 +120,14 @@ func doRequest(request httpline) httpline {
 		request.Errno, request.Err = 10, err.Error()
 		return request
 	}
-	resp, err := extractor.ExtractResponse(conn, isHEAD(request.Req))
+	now := time.Now()
+	request.Reqat = &now
+	timedConn := &timedReader{r: conn}
+	resp, err := extractor.ExtractResponse(timedConn, isHEAD(request.Req))
 	request.Resp = resp
+	if !timedConn.readAt.IsZero() {
+		request.Ping = timedConn.readAt.Sub(*request.Reqat).Milliseconds()
+	}
 	if err != nil {
 		request.Errno, request.Err = 20, err.Error()
 		return request
