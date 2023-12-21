@@ -105,13 +105,14 @@ func doRequests(requests, results chan httpline) {
 
 func doRequest(request httpline) httpline {
 	setDefaultTLSAndPortIfNecessary(&request)
-	conn, err := getConn(request)
+	deadline := time.Now().Add(timeout)
+	conn, err := getConn(request, deadline)
 	if err != nil {
 		request.Errno, request.Err = 1, err.Error()
 		return request
 	}
 	defer conn.Close()
-	if err = conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+	if err = conn.SetDeadline(deadline); err != nil {
 		request.Errno, request.Err = 100, err.Error()
 		return request
 	}
@@ -149,12 +150,13 @@ func setDefaultTLSAndPortIfNecessary(request *httpline) {
 	}
 }
 
-func getConn(request httpline) (net.Conn, error) {
+func getConn(request httpline, deadline time.Time) (net.Conn, error) {
+	dialer := net.Dialer{Deadline: deadline}
 	addr := fmt.Sprintf("%s:%d", request.Host, request.Port)
 	if request.TLS != nil && !*request.TLS {
-		return net.Dial("tcp", addr)
+		return dialer.Dial("tcp", addr)
 	}
-	return tls.Dial("tcp", addr, &tlsConfig)
+	return tls.DialWithDialer(&dialer, "tcp", addr, &tlsConfig)
 }
 
 func isHEAD(req string) bool {
