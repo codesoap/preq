@@ -16,6 +16,11 @@ $ pfuzz -w /path/to/wordlist -u 'https://foo.com/FUZZ' | drip 500ms | preq -p 20
 ...
 ```
 
+# Installation
+You can download precompiled binaries from the [releases
+page](https://github.com/codesoap/preq/releases) or install it with
+`go install github.com/codesoap/preq@latest`.
+
 # Usage
 ```console
 $ preq -h

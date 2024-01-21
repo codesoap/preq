@@ -15,6 +15,8 @@ import (
 	"github.com/codesoap/preq/extractor"
 )
 
+// TODO: do not touch lines with already filled err or resp?!
+
 var usageDetails = `
 preq expects input via standard input in the httpipe format. At least
 the "host" and "req" fields must be present. If the "tls" field is
