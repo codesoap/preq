@@ -2,14 +2,17 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/codesoap/preq/extractor"
@@ -109,17 +112,18 @@ func doRequest(request httpline) httpline {
 	deadline := time.Now().Add(timeout)
 	conn, err := getConn(request, deadline)
 	if err != nil {
-		request.Errno, request.Err = 1, err.Error()
+		request.Errno, request.Err = toErrno(err), err.Error()
 		return request
 	}
 	defer conn.Close()
 	if err = conn.SetDeadline(deadline); err != nil {
-		request.Errno, request.Err = 100, err.Error()
+		request.Errno, request.Err = 99, err.Error()
 		return request
 	}
 	_, err = fmt.Fprint(conn, request.Req)
 	if err != nil {
-		request.Errno, request.Err = 10, err.Error()
+		// FIXME: errno 30 may not be ideal.
+		request.Errno, request.Err = 30, err.Error()
 		return request
 	}
 	now := jtime(time.Now())
@@ -131,10 +135,38 @@ func doRequest(request httpline) httpline {
 		request.Ping = timedConn.readAt.Sub(time.Time(*request.Reqat)).Milliseconds()
 	}
 	if err != nil {
-		request.Errno, request.Err = 20, err.Error()
+		request.Errno, request.Err = 99, err.Error()
 		return request
 	}
 	return request
+}
+
+func toErrno(err error) int {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return 31
+	}
+	switch err2 := err.(type) {
+	case *net.OpError:
+		switch err3 := err2.Err.(type) {
+		case *net.DNSError:
+			if err3.IsNotFound {
+				return 10
+			} else if err3.IsTimeout {
+				return 11
+			}
+		case *os.SyscallError:
+			if err3.Err == syscall.ECONNREFUSED {
+				return 30
+			}
+		case net.Error:
+			if err3.Timeout() {
+				return 31
+			}
+		}
+	case *tls.CertificateVerificationError:
+		return 20 // FIXME: Cannot distinguish different TLS errors.
+	}
+	return 99 // Undefined errno for unknown error.
 }
 
 func setDefaultTLSAndPortIfNecessary(request *httpline) {
