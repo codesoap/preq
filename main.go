@@ -31,7 +31,6 @@ Example:
 echo '{"host":"x.com","req":"GET / HTTP/1.1\\r\\nHost: x.com\\r\\n\\r\\n"}' | preq
 `
 
-var tlsConfig = tls.Config{}
 var timeout time.Duration
 var pFlag int
 
@@ -158,7 +157,7 @@ func getConn(request httpline, deadline time.Time) (net.Conn, error) {
 	if request.TLS != nil && !*request.TLS {
 		return dialer.Dial("tcp", addr)
 	}
-	return tls.DialWithDialer(&dialer, "tcp", addr, &tlsConfig)
+	return tls.DialWithDialer(&dialer, "tcp", addr, nil)
 }
 
 func isHEAD(req string) bool {
